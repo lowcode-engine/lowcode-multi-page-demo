@@ -24,6 +24,7 @@ import TitleSetter from '@alilc/lowcode-setter-title';
 import BehaviorSetter from '../../setters/behavior-setter';
 import CustomSetter from '../../setters/custom-setter';
 import Logo from '../../sample-plugins/logo';
+import PageManage from './PageManage'
 
 import {
   loadIncrementalAssets,
@@ -108,6 +109,19 @@ export default async function registerPlugins() {
         project.onSimulatorRendererReady(() => {
           componentsPane?.enable?.();
         })
+        skeleton.add({
+          index: -1,
+          area: 'leftArea',
+          type: 'PanelDock',
+          name: 'pagesPane',
+          content: PageManage,
+          contentProps: {},
+          props: {
+            align: 'top',
+            icon: 'kaiwenjianjia',
+            description: '页面管理',
+          },
+        });
       },
     };
   }
