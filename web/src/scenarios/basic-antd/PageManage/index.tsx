@@ -16,6 +16,7 @@ import {
   Divider,
   message
 } from 'antd';
+import { UploadChangeParam } from 'antd/lib/upload'
 import { FileAddOutlined, ExportOutlined, ImportOutlined, DeleteTwoTone } from '@ant-design/icons'
 
 import {
@@ -23,31 +24,49 @@ import {
   saveSchema,
 } from '../../../universal/utils';
 
-const baseUrl = 'https://3010-blueju-lowcodemultipage-tqz8gsmq870.ws-us59.gitpod.io'
+let defaultPageSchema: PageSchema = require('../schema.json')
+/** 接口请求域名端口前缀，根据服务实际情况调整 */
+const baseUrl = 'https://3010-blueju-lowcodemultipage-tqz8gsmq870.ws-us60.gitpod.io'
 
-export default (props: any) => {
+/** 新建表单字段值 */
+interface ICreateFormFieldsValue {
+  fileName: string
+}
+
+export default () => {
+  // 新建表单实例
   const [createPageForm] = Form.useForm();
+  // 页面列表
   const [pages, setPages] = useState<PageSchema[]>([]);
+  // 当前页面
   const [currentPage, setCurrentPage] = useState('');
-  const [visible, setVisible] = useState(false);
+  // 新建页面弹窗是否可见
+  const [createPageModalVisible, setPageModalVisible] = useState(false);
 
   useEffect(() => {
-    getPages();
+    getPages()
+      .then((pages: PageSchema[]) => {
+        setCurrentPage(pages[0].fileName)
+        project.openDocument(pages[0])
+      })
   }, []);
+
+  /** 开启/关闭新建页面弹窗 */
+  const openCreatePageModal = () => setPageModalVisible(true);
+  const closeCreatePageModal = () => setPageModalVisible(false);
 
   /**
    * 获取所有页面
    */
   const getPages = () => {
-    fetch(`${baseUrl}/pages`, { method: 'GET' })
+    return fetch(`${baseUrl}/pages`, { method: 'GET' })
       .then((res) => res.json())
       .then((resJson: {
         code: 0,
         data: PageSchema[]
       }) => {
         setPages(resJson.data);
-        // 默认选择第一个页面
-        setCurrentPage(resJson.data[0].fileName)
+        return resJson.data
       })
   };
 
@@ -70,16 +89,28 @@ export default (props: any) => {
       })
   };
 
-  const createPage = ({ pageId }) => {
-    const defaultProjectSchema = require('../schema.json');
-    project.removeDocument(project.currentDocument as any);
-    project.openDocument(defaultProjectSchema);
-    config.set('currentPage', pageId);
-    setCurrentPage(pageId);
-    saveSchema();
-    setVisible(false);
-    getPages();
-    createPageForm.resetFields();
+  /** 新建页面 */
+  const createPage = (values: ICreateFormFieldsValue) => {
+    const { fileName } = values
+    defaultPageSchema.fileName = fileName
+    fetch(`${baseUrl}/page`, {
+      method: 'POST',
+      body: JSON.stringify({ pageSchema: defaultPageSchema }),
+      headers: {
+        'content-type': 'application/json;charset=UTF-8'
+      }
+    })
+      .then((res) => res.json())
+      .then((resJson: { code: 0 | -1, msg: string }) => {
+        if (resJson.code === 0) {
+          message.success(resJson.msg)
+          getPages();
+          createPageForm.resetFields();
+          setPageModalVisible(false);
+        } else {
+          message.error(resJson.msg)
+        }
+      })
   };
 
   /** 导出 */
@@ -96,40 +127,34 @@ export default (props: any) => {
   };
 
   /** 导入 */
-  const importAllPageSchema = (info) => {
+  const importAllPageSchema = (info: UploadChangeParam) => {
     if (info.file.status === 'done') {
       const file = info.file.originFileObj;
       const fileReader = new FileReader();
-      fileReader.readAsText(file);
+      fileReader.readAsText(file!);
       fileReader.onload = () => {
-        const allPageSchema = JSON.parse(fileReader.result);
-        let pageId;
-        allPageSchema.forEach((item: string[], index: number) => {
-          if (index === 0) pageId = item[0].split(':')[0];
-          localStorage.setItem(item[0], item[1]);
-        });
-        message.success('导入成功');
-        getPages();
-        setCurrentPage(pageId);
-        config.set('currentPage', pageId);
-        saveSchema();
+        // 具体逻辑待补充
+        // const allPageSchema = JSON.parse(fileReader.result as string);
+        // let pageId;
+        // allPageSchema.forEach((item: string[], index: number) => {
+        //   if (index === 0) pageId = item[0].split(':')[0];
+        //   localStorage.setItem(item[0], item[1]);
+        // });
+        // message.success('导入成功');
+        // getPages();
+        // setCurrentPage(pageId);
+        // saveSchema();
       };
     }
   };
 
   const handleSelect = ({ selectedKeys }: SelectInfo) => {
-    const pageId = selectedKeys[0];
-    setCurrentPage(pageId);
-    config.set('currentPage', pageId);
-    const schema = pages.find(item => item.fileName === pageId);
-    project.removeDocument(project.currentDocument as any);
+    const fileName = selectedKeys[0];
+    setCurrentPage(fileName);
+    const schema = pages.find(item => item.fileName === fileName);
+    project.currentDocument && project.removeDocument(project.currentDocument);
     project.openDocument(schema);
   };
-
-  /** 开启/关闭新建页面弹窗 */
-  const openCreatePageModal = () => setVisible(true);
-  const closeCreatePageModal = () => setVisible(false);
-
 
   return (
     <>
@@ -157,11 +182,11 @@ export default (props: any) => {
           <Upload
             showUploadList={false}
             onChange={importAllPageSchema}
-          // style={{ display: 'block' }}
           >
             <Button
               size="small"
               icon={<ImportOutlined />}
+              disabled
             >
               导入
             </Button>
@@ -190,7 +215,7 @@ export default (props: any) => {
 
       <Modal
         title="新建页面"
-        visible={visible}
+        visible={createPageModalVisible}
         footer={null}
         onCancel={closeCreatePageModal}
       >
@@ -199,22 +224,12 @@ export default (props: any) => {
           labelCol={{ span: 6 }}
           wrapperCol={{ span: 16 }}
           onFinish={createPage}
-          initialValues={{
-            pageId: '',
-            pageName: '',
-          }}
+          initialValues={{ fileName: '' }}
         >
           <Form.Item
-            name="pageId"
-            label="页面ID"
-            rules={[{ required: true, message: '请输入页面ID' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="pageName"
-            label="页面名称"
-            rules={[{ required: true, message: '请输入页面名称' }]}
+            name="fileName"
+            label="文件名"
+            required
           >
             <Input />
           </Form.Item>
