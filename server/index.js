@@ -3,11 +3,13 @@ const app = express();
 const port = 3010;
 const path = require('path');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 
 let pages = require('./pages.json')
 
 app.use(cors());
 app.use(express.static('static'));
+app.use(bodyParser.json())
 
 app.get('/', (req, res) => {
   res.sendFile(path.resolve('pages/index.html'));
@@ -20,9 +22,27 @@ app.get('/pages', (req, res) => {
   })
 });
 
+app.post('/page', (req, res) => {
+  const { pageSchema = {} } = req.body
+  if (Object.keys(pageSchema).length) {
+    console.log(pages.length);
+    pages.push(pageSchema)
+    console.log(pages.length);
+    res.json({
+      code: 0,
+      msg: '创建新页面成功'
+    })
+  } else {
+    res.json({
+      code: -1,
+      msg: '缺少参数：页面描述 Schema'
+    })
+  }
+});
+
+
 app.delete('/page/:fileName', (req, res) => {
   const { fileName = '' } = req.params
-  console.log(fileName);
   if (fileName.length) {
     const index = pages.findIndex(page => page.fileName === fileName)
     if (index === -1) {
