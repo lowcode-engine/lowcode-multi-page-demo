@@ -76,7 +76,11 @@ export default () => {
       }) => {
         if (resJson.code === 0) {
           message.success(resJson.msg)
-          getPages();
+          getPages()
+            .then((pages: PageSchema[]) => {
+              setCurrentPage(pages[0].fileName)
+              project.openDocument(pages[0])
+            })
         } else {
           message.error(resJson.msg)
         }
