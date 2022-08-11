@@ -1,11 +1,10 @@
-import { PageSchema } from '@alilc/lowcode-types';
+import { PageSchema, TransformStage } from '@alilc/lowcode-types';
 import { SelectInfo } from 'rc-menu/lib/interface';
-import { useEffect, useState, useRef } from 'react';
-import { project, config, material } from '@alilc/lowcode-engine';
+import { useEffect, useState } from 'react';
+import { project } from '@alilc/lowcode-engine';
 import {
   Row,
   Col,
-  Spin,
   Form,
   Menu,
   Input,
@@ -18,11 +17,6 @@ import {
 } from 'antd';
 import { UploadChangeParam } from 'antd/lib/upload'
 import { FileAddOutlined, ExportOutlined, ImportOutlined, DeleteTwoTone } from '@ant-design/icons'
-
-import {
-  getProjectSchemaFromLocalStorage,
-  saveSchema,
-} from '../../../universal/utils';
 
 let defaultPageSchema: PageSchema = require('../schema.json')
 /** 接口请求域名端口前缀，根据服务实际情况调整 */
@@ -93,12 +87,10 @@ export default () => {
   const createPage = (values: ICreateFormFieldsValue) => {
     const { fileName } = values
     defaultPageSchema.fileName = fileName
-    fetch(`${baseUrl}/page`, {
+    fetch(`${baseUrl}/page/${fileName}`, {
       method: 'POST',
       body: JSON.stringify({ pageSchema: defaultPageSchema }),
-      headers: {
-        'content-type': 'application/json;charset=UTF-8'
-      }
+      headers: { 'content-type': 'application/json;charset=UTF-8' }
     })
       .then((res) => res.json())
       .then((resJson: { code: 0 | -1, msg: string }) => {
@@ -148,12 +140,43 @@ export default () => {
     }
   };
 
-  const handleSelect = ({ selectedKeys }: SelectInfo) => {
+  /** 保存页面 */
+  const savePage = () => {
+    const pageSchema = project.currentDocument?.exportSchema(TransformStage.Save)
+    return fetch(`${baseUrl}/page/${pageSchema?.fileName}`, {
+      method: 'PUT',
+      body: JSON.stringify({ pageSchema }),
+      headers: { 'content-type': 'application/json;charset=UTF-8' }
+    })
+      .then((res) => res.json())
+      .then((resJson: { code: 0 | -1, msg: string }) => {
+        if (resJson.code === 0) {
+          message.success('上一页面已自动保存')
+        } else {
+          message.error(resJson.msg)
+          return Promise.reject()
+        }
+      })
+  }
+
+  const handleSelect = async ({ selectedKeys }: SelectInfo) => {
+    const prevCurrentPage = currentPage
     const fileName = selectedKeys[0];
     setCurrentPage(fileName);
-    const schema = pages.find(item => item.fileName === fileName);
-    project.currentDocument && project.removeDocument(project.currentDocument);
-    project.openDocument(schema);
+    // 在线保存
+    savePage()
+      .then(() => {
+        // 使用低代码编辑的页面往往都挺复杂，确保在线保存成功后再切其他页面
+        const schema = pages.find(item => item.fileName === fileName)!;
+        project.currentDocument && project.removeDocument(project.currentDocument);
+        project.openDocument(schema);
+        // 为了更快地将所点击页面的 schema 渲染到画布上，重新获取所有页面的数据这一操作可以晚点再做
+        getPages()
+      })
+      .catch(() => {
+        // 如果在线保存失败，页面菜单高亮项切回前一个页面
+        setCurrentPage(prevCurrentPage)
+      })
   };
 
   return (
@@ -254,5 +277,3 @@ export default () => {
     </>
   );
 };
-
-
