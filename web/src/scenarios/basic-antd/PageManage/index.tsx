@@ -20,7 +20,7 @@ import { FileAddOutlined, ExportOutlined, ImportOutlined, DeleteTwoTone } from '
 
 let defaultPageSchema: PageSchema = require('../schema.json')
 /** 接口请求域名端口前缀，根据服务实际情况调整 */
-const baseUrl = 'https://3010-blueju-lowcodemultipage-tqz8gsmq870.ws-us60.gitpod.io'
+const baseUrl = 'http://localhost:3010'
 
 /** 新建表单字段值 */
 interface ICreateFormFieldsValue {
@@ -41,6 +41,7 @@ export default () => {
     getPages()
       .then((pages: PageSchema[]) => {
         setCurrentPage(pages[0].fileName)
+        project.currentDocument && project.removeDocument(project.currentDocument);
         project.openDocument(pages[0])
       })
   }, []);
